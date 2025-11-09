@@ -59,46 +59,63 @@ class PositionEncoding(nn.Module):
 class TranslationModel(nn.Module):
     def __init__(self, zh_vocab_size, en_vocab_size, zh_padding_index, en_padding_index):
         super().__init__()
-        self.src_embedding = nn.Embedding(num_embeddings=zh_vocab_size,
-                                          embedding_dim=config.DIM_MODEL,
-                                          padding_idx=zh_padding_index)
+        self.src_embedding = nn.Embedding(
+            num_embeddings=zh_vocab_size,
+            embedding_dim=config.DIM_MODEL,
+            padding_idx=zh_padding_index
+        )
 
-        self.tgt_embedding = nn.Embedding(num_embeddings=en_vocab_size,
-                                          embedding_dim=config.DIM_MODEL,
-                                          padding_idx=en_padding_index)
+        self.tgt_embedding = nn.Embedding(
+            num_embeddings=en_vocab_size,
+            embedding_dim=config.DIM_MODEL,
+            padding_idx=en_padding_index
+        )
 
         self.position_encoding = PositionEncoding(dim_model=config.DIM_MODEL)
+        # 是否使用位置编码（由 config 控制）
+        self.use_positional_encoding = getattr(config, 'USE_POSITION_ENCODING', True)
 
-        # 可替换为 transformer.Transformer
-        self.transformer = nn.Transformer(d_model=config.DIM_MODEL,
-                                          nhead=config.NUM_HEADS,
-                                          num_encoder_layers=config.NUM_ENCODER_LAYERS,
-                                          num_decoder_layers=config.NUM_DECODER_LAYERS,
-                                          batch_first=True)
+        # 这里你目前用的是 nn.Transformer，如果之后想换成手写的 transformer.Transformer 也可以
+        self.transformer = nn.Transformer(
+            d_model=config.DIM_MODEL,
+            nhead=config.NUM_HEADS,
+            num_encoder_layers=config.NUM_ENCODER_LAYERS,
+            num_decoder_layers=config.NUM_DECODER_LAYERS,
+            batch_first=True
+        )
 
-        self.linear = nn.Linear(in_features=config.DIM_MODEL,
-                                out_features=en_vocab_size)
+        self.linear = nn.Linear(
+            in_features=config.DIM_MODEL,
+            out_features=en_vocab_size
+        )
 
     def encode(self, src, src_pad_mask):
         # src.shape: [batch_size, sel_len]
         src_embed = self.src_embedding(src)
         # src_embed.shape: [batch_size, seq_len, d_model]
-        src_embed = self.position_encoding(src_embed)
+        if self.use_positional_encoding:
+            src_embed = self.position_encoding(src_embed)
         # src_embed.shape: [batch_size, seq_len, d_model]
 
-        memory = self.transformer.encoder(src=src_embed, src_key_padding_mask=src_pad_mask)
-        # memory.shape: [batch_size, seq_len, d_model]
+        memory = self.transformer.encoder(
+            src=src_embed,
+            src_key_padding_mask=src_pad_mask
+        )
         return memory
 
     def decode(self, tgt, memory, tgt_mask, memory_pad_mask, tgt_pad_mask):
         tgt_embed = self.tgt_embedding(tgt)
-        tgt_embed = self.position_encoding(tgt_embed)
-        # tgt_embed.shape: [batch_size, seq_len, d_model]
-        output = self.transformer.decoder(tgt=tgt_embed, memory=memory, tgt_mask=tgt_mask,
-                                          tgt_key_padding_mask=tgt_pad_mask, memory_key_padding_mask=memory_pad_mask)
-        # output.shape: [batch_size, seq_len, d_model]
+        if self.use_positional_encoding:
+            tgt_embed = self.position_encoding(tgt_embed)
+
+        output = self.transformer.decoder(
+            tgt=tgt_embed,
+            memory=memory,
+            tgt_mask=tgt_mask,
+            tgt_key_padding_mask=tgt_pad_mask,
+            memory_key_padding_mask=memory_pad_mask
+        )
         output = self.linear(output)
-        # output.shape: [batch_size, seq_len, en_vocab_size]
         return output
 
     def forward(self, src, tgt, src_pad_mask, tgt_mask, tgt_pad_mask):
