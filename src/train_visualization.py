@@ -117,7 +117,7 @@ def train():
     writer = SummaryWriter(log_dir=config.LOGS_DIR)
     metrics_dir = getattr(config, 'RESULTS_DIR', (config.ROOT_DIR / 'results'))
     os.makedirs(metrics_dir, exist_ok=True)
-    csv_path = metrics_dir / 'metrics.csv'
+    csv_path = metrics_dir / 'metrics1.csv'
 
     # header: 多加 train_ppl / val_ppl
     if not os.path.exists(csv_path):
