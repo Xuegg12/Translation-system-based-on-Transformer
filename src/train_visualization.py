@@ -108,18 +108,19 @@ def train():
     optimizer = torch.optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
     loss_function = torch.nn.CrossEntropyLoss(
         ignore_index=en_tokenizer.pad_token_id,
-        label_smoothing=0.0
+        label_smoothing=getattr(config, 'LABEL_SMOOTHING', 0.0)
     )
 
     train_loader = get_dataloader(train=True)
     val_loader = get_dataloader(train=False)
 
-    writer = SummaryWriter(log_dir=config.LOGS_DIR)
+    exp_name = getattr(config, 'EXPERIMENT_NAME', 'exp')
+    writer = SummaryWriter(log_dir=config.LOGS_DIR / exp_name)
+
     metrics_dir = getattr(config, 'RESULTS_DIR', (config.ROOT_DIR / 'results'))
     os.makedirs(metrics_dir, exist_ok=True)
-    csv_path = metrics_dir / 'metrics1.csv'
-
-    # header: 多加 train_ppl / val_ppl
+    csv_path = metrics_dir / f'metrics_{exp_name}.csv'
+# header: 多加 train_ppl / val_ppl
     if not os.path.exists(csv_path):
         with open(csv_path, 'w', newline='') as f:
             csv.writer(f).writerow([
@@ -176,8 +177,9 @@ def train():
         # 保存最优
         if val_loss < best_loss:
             best_loss = val_loss
-            torch.save(model.state_dict(), config.MODELS_DIR / 'model_vis.pt')
-            print('模型保存成功')
+            ckpt_path = config.MODELS_DIR / f'model_{exp_name}.pt'
+            torch.save(model.state_dict(), ckpt_path)
+            print(f'模型保存成功: {ckpt_path}')
         else:
             print('模型无需保存')
 
